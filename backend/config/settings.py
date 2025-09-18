@@ -10,7 +10,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key-change-in
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
 
 # Application definition
 INSTALLED_APPS = [
@@ -22,12 +22,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
-    'apps.authentication',
-    'apps.banking',
-    'apps.transactions',
-    'apps.categories',
-    'apps.ai_services',
-    'apps.dashboard',
+    'drf_spectacular',
+    'apps.authentication.apps.AuthenticationConfig',
+    'apps.banking.apps.BankingConfig',
+    'apps.transactions.apps.TransactionsConfig',
+    'apps.categories.apps.CategoriesConfig',
+    'apps.ai_services.apps.AiServicesConfig',
+    'apps.dashboard.apps.DashboardConfig',
 ]
 
 MIDDLEWARE = [
@@ -135,6 +136,12 @@ CELERY_TIMEZONE = 'America/Sao_Paulo'
 # Custom user model
 AUTH_USER_MODEL = 'authentication.CustomUser'
 
+# Authentication Backends
+AUTHENTICATION_BACKENDS = (
+    'apps.authentication.backends.CaseInsensitiveModelBackend',
+    'django.contrib.auth.backends.ModelBackend',
+)
+
 # REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -148,6 +155,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # JWT Settings
@@ -182,4 +190,11 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
     'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Grana.ai API',
+    'DESCRIPTION': 'API for Grana.ai, a personal finance management app.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
 }

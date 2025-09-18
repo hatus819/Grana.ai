@@ -14,14 +14,22 @@ class AIService:
     @staticmethod
     def categorize_transaction(description, amount):
         cache_key = f"categorize_{description}_{amount}"
-        cached_result = cache.get(cache_key)
-        if cached_result:
-            return cached_result
+        try:
+            cached_result = cache.get(cache_key)
+            if cached_result:
+                return cached_result
+        except Exception:
+            # Cache might not be available (e.g., Redis down)
+            pass
 
         # Check database cache
-        db_cache = AICache.objects.filter(key=cache_key).first()
-        if db_cache and not db_cache.is_expired():
-            return db_cache.value
+        try:
+            db_cache = AICache.objects.filter(key=cache_key).first()
+            if db_cache and not db_cache.is_expired():
+                return db_cache.value
+        except Exception:
+            # Database might not be available
+            pass
 
         client = AIService.get_client()
         if not client:
@@ -55,11 +63,17 @@ class AIService:
             category = response.choices[0].message.content.strip()
 
             # Cache in Redis and DB
-            cache.set(cache_key, category, timeout=3600)  # 1 hour
-            AICache.objects.update_or_create(
-                key=cache_key,
-                defaults={'value': category}
-            )
+            try:
+                cache.set(cache_key, category, timeout=3600)  # 1 hour
+            except Exception:
+                pass
+            try:
+                AICache.objects.update_or_create(
+                    key=cache_key,
+                    defaults={'value': category}
+                )
+            except Exception:
+                pass
 
             return category
         except Exception as e:
@@ -69,15 +83,15 @@ class AIService:
     @staticmethod
     def fallback_categorization(description):
         desc_lower = description.lower()
-        if any(word in desc_lower for word in ['restaurante', 'mercado', 'supermercado', 'padaria']):
+        if any(word in desc_lower for word in ['restaurante', 'mercado', 'supermercado', 'padaria', 'ifood']):
             return 'Alimentação'
-        elif any(word in desc_lower for word in ['uber', 'taxi', 'onibus', 'metro', 'combustivel']):
+        elif any(word in desc_lower for word in ['uber', 'taxi', 'onibus', 'metro', 'combustivel', 'posto']):
             return 'Transporte'
-        elif any(word in desc_lower for word in ['cinema', 'teatro', 'show', 'bar']):
+        elif any(word in desc_lower for word in ['cinema', 'teatro', 'show', 'bar', 'netflix', 'spotify']):
             return 'Lazer'
-        elif any(word in desc_lower for word in ['farmacia', 'medico', 'hospital']):
+        elif any(word in desc_lower for word in ['farmacia', 'medico', 'hospital', 'clinica']):
             return 'Saúde'
-        elif any(word in desc_lower for word in ['escola', 'universidade', 'curso']):
+        elif any(word in desc_lower for word in ['escola', 'universidade', 'curso', 'livro']):
             return 'Educação'
         elif any(word in desc_lower for word in ['shopping', 'loja', 'compras']):
             return 'Compras'

@@ -39,6 +39,10 @@ const DashboardScreen = ({ navigation }: any) => {
     }
   );
 
+  const totalBalance = transactions?.data.results.reduce((sum, t) => sum + t.amount, 0) || 0;
+  const income = transactions?.data.results.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0) || 0;
+  const expenses = transactions?.data.results.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0) || 0;
+
   const handleLogout = async () => {
     await AsyncStorage.removeItem('accessToken');
     await AsyncStorage.removeItem('refreshToken');
@@ -70,6 +74,29 @@ const DashboardScreen = ({ navigation }: any) => {
         <Text style={styles.title}>Grana.AI</Text>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>Sair</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Saldo Total</Text>
+          <Text style={[styles.statValue, totalBalance >= 0 ? styles.positive : styles.negative]}>
+            R$ {totalBalance.toFixed(2)}
+          </Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Receitas</Text>
+          <Text style={[styles.statValue, styles.positive]}>R$ {income.toFixed(2)}</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Despesas</Text>
+          <Text style={[styles.statValue, styles.negative]}>R$ {Math.abs(expenses).toFixed(2)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity style={styles.connectButton} onPress={() => navigation.navigate('BankConnection')}>
+          <Text style={styles.connectButtonText}>Conectar Conta Bancária</Text>
         </TouchableOpacity>
       </View>
 
@@ -175,6 +202,49 @@ const styles = StyleSheet.create({
   transactionCategory: {
     fontSize: 12,
     marginTop: 2,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+    paddingBottom: 10,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 8,
+    marginHorizontal: 5,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 5,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  actionsContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+  },
+  connectButton: {
+    backgroundColor: '#007bff',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  connectButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

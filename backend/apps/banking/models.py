@@ -15,4 +15,4 @@ class BankAccount(models.Model):
         unique_together = ('user', 'pluggy_account_id')
 
     def __str__(self):
-        return f"{self.user.username} - {self.bank_name} - {self.account_type}"
+        return f"{self.user.email} - {self.bank_name} - {self.account_type}"

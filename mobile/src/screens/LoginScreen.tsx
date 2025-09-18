@@ -9,7 +9,6 @@ const API_BASE_URL = 'http://localhost:8000/api/v1';
 interface LoginResponse {
   user: {
     id: number;
-    username: string;
     email: string;
     phone: string;
     cpf: string;
@@ -21,11 +20,11 @@ interface LoginResponse {
 }
 
 const LoginScreen = ({ navigation }: any) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const loginMutation = useMutation(
-    (data: { username: string; password: string }) =>
+    (data: { email: string; password: string }) =>
       axios.post<LoginResponse>(`${API_BASE_URL}/auth/login/`, data),
     {
       onSuccess: async (response) => {
@@ -40,11 +39,11 @@ const LoginScreen = ({ navigation }: any) => {
   );
 
   const handleLogin = () => {
-    if (!username || !password) {
+    if (!email || !password) {
       Alert.alert('Erro', 'Preencha todos os campos');
       return;
     }
-    loginMutation.mutate({ username, password });
+    loginMutation.mutate({ email, password });
   };
 
   return (
@@ -54,10 +53,11 @@ const LoginScreen = ({ navigation }: any) => {
 
       <TextInput
         style={styles.input}
-        placeholder="Usuário"
-        value={username}
-        onChangeText={setUsername}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
         autoCapitalize="none"
+        keyboardType="email-address"
       />
 
       <TextInput
