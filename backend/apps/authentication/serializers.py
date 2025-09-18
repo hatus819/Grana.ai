@@ -8,11 +8,11 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ('username', 'email', 'password', 'password_confirm', 'phone', 'cpf')
+        fields = ('email', 'password', 'password_confirm', 'phone', 'cpf')
 
     def validate(self, data):
         if data['password'] != data['password_confirm']:
-            raise serializers.ValidationError("Passwords do not match.")
+            raise serializers.ValidationError({"password_confirm": "Passwords do not match."})
         return data
 
     def create(self, validated_data):
@@ -21,14 +21,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
+    email = serializers.EmailField()
     password = serializers.CharField()
 
     def validate(self, data):
-        username = data.get('username')
+        email = data.get('email')
         password = data.get('password')
-        if username and password:
-            user = authenticate(username=username, password=password)
+        if email and password:
+            user = authenticate(email=email, password=password)
             if user:
                 if user.is_active:
                     data['user'] = user
@@ -37,7 +37,7 @@ class LoginSerializer(serializers.Serializer):
             else:
                 raise serializers.ValidationError("Unable to log in with provided credentials.")
         else:
-            raise serializers.ValidationError("Must include 'username' and 'password'.")
+            raise serializers.ValidationError("Must include 'email' and 'password'.")
         return data
 
 class RefreshTokenSerializer(serializers.Serializer):

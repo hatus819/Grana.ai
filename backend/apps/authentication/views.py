@@ -1,6 +1,6 @@
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import RegisterSerializer, LoginSerializer, RefreshTokenSerializer
@@ -15,7 +15,6 @@ def register(request):
         return Response({
             'user': {
                 'id': user.id,
-                'username': user.username,
                 'email': user.email,
                 'phone': user.phone,
                 'cpf': user.cpf,
@@ -37,7 +36,6 @@ def login(request):
         return Response({
             'user': {
                 'id': user.id,
-                'username': user.username,
                 'email': user.email,
                 'phone': user.phone,
                 'cpf': user.cpf,
@@ -63,3 +61,8 @@ def refresh_token(request):
         except Exception as e:
             return Response({'error': 'Invalid refresh token'}, status=status.HTTP_400_BAD_REQUEST)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def protected_view(request):
+    return Response({'message': 'This is a protected view'}, status=status.HTTP_200_OK)

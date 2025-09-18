@@ -20,7 +20,6 @@ interface RegisterResponse {
 }
 
 const RegisterScreen = ({ navigation }: any) => {
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -28,7 +27,7 @@ const RegisterScreen = ({ navigation }: any) => {
   const [cpf, setCpf] = useState('');
 
   const registerMutation = useMutation(
-    (data: { username: string; email: string; password: string; password_confirm: string; phone: string; cpf: string }) =>
+    (data: { email: string; password: string; password_confirm: string; phone: string; cpf: string }) =>
       axios.post<RegisterResponse>(`${API_BASE_URL}/auth/register/`, data),
     {
       onSuccess: () => {
@@ -45,7 +44,7 @@ const RegisterScreen = ({ navigation }: any) => {
   );
 
   const handleRegister = () => {
-    if (!username || !email || !password || !passwordConfirm) {
+    if (!email || !password || !passwordConfirm) {
       Alert.alert('Erro', 'Preencha todos os campos obrigatórios');
       return;
     }
@@ -53,21 +52,13 @@ const RegisterScreen = ({ navigation }: any) => {
       Alert.alert('Erro', 'As senhas não coincidem');
       return;
     }
-    registerMutation.mutate({ username, email, password, password_confirm: passwordConfirm, phone, cpf });
+    registerMutation.mutate({ email, password, password_confirm: passwordConfirm, phone, cpf });
   };
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Grana.AI</Text>
       <Text style={styles.subtitle}>Cadastro</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Usuário"
-        value={username}
-        onChangeText={setUsername}
-        autoCapitalize="none"
-      />
 
       <TextInput
         style={styles.input}

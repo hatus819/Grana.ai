@@ -21,23 +21,24 @@ def list_bank_accounts(request):
 def connect_bank_account(request):
     serializer = ConnectBankAccountSerializer(data=request.data)
     if serializer.is_valid():
+        item_id = serializer.validated_data['itemId']
         try:
-            pluggy_response = PluggyService.connect_account(
-                user_id=request.user.id,
-                bank_code=serializer.validated_data['bank_code'],
-                account_number=serializer.validated_data['account_number']
-            )
+            accounts_data = PluggyService.get_accounts(item_id)
+            created_accounts = []
+            for account_data in accounts_data['results']:
+                bank_account, created = BankAccount.objects.update_or_create(
+                    user=request.user,
+                    pluggy_account_id=account_data['id'],
+                    defaults={
+                        'bank_name': account_data.get('name', 'Unknown'),
+                        'account_type': account_data.get('type', 'OTHER'),
+                        'balance': account_data.get('balance', 0),
+                        'is_active': True,
+                    }
+                )
+                created_accounts.append(bank_account)
 
-            # Create BankAccount in our database
-            bank_account = BankAccount.objects.create(
-                user=request.user,
-                pluggy_account_id=pluggy_response['account_id'],
-                bank_name=pluggy_response['bank_name'],
-                account_type=pluggy_response['account_type'],
-                balance=pluggy_response['balance']
-            )
-
-            response_serializer = BankAccountSerializer(bank_account)
+            response_serializer = BankAccountSerializer(created_accounts, many=True)
             return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
         except Exception as e:

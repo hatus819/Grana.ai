@@ -3,41 +3,32 @@ import os
 from django.conf import settings
 
 class PluggyService:
-    BASE_URL = 'https://api.pluggy.ai'  # Assuming this is the base URL, adjust if needed
+    BASE_URL = 'https://api.pluggy.ai'
     API_KEY = os.environ.get('PLUGGY_API_KEY')
 
     @staticmethod
     def get_headers():
         return {
-            'Authorization': f'Bearer {PluggyService.API_KEY}',
+            'X-API-KEY': PluggyService.API_KEY,
             'Content-Type': 'application/json',
         }
 
     @staticmethod
-    def connect_account(user_id, bank_code, account_number):
-        # This is a placeholder for Pluggy's account connection flow
-        # In reality, Pluggy might require OAuth or specific flow
-        url = f'{PluggyService.BASE_URL}/accounts/connect'
-        data = {
-            'user_id': user_id,
-            'bank_code': bank_code,
-            'account_number': account_number,
-        }
-        response = requests.post(url, json=data, headers=PluggyService.get_headers())
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise Exception(f'Pluggy API error: {response.text}')
+    def get_accounts(item_id):
+        url = f'{PluggyService.BASE_URL}/accounts'
+        params = {'itemId': item_id}
+        response = requests.get(url, params=params, headers=PluggyService.get_headers())
+        response.raise_for_status()
+        return response.json()
 
     @staticmethod
-    def get_transactions(account_id, start_date, end_date):
-        url = f'{PluggyService.BASE_URL}/accounts/{account_id}/transactions'
+    def get_transactions(account_id, from_date, to_date):
+        url = f'{PluggyService.BASE_URL}/transactions'
         params = {
-            'start_date': start_date,
-            'end_date': end_date,
+            'accountId': account_id,
+            'from': from_date,
+            'to': to_date,
         }
         response = requests.get(url, params=params, headers=PluggyService.get_headers())
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise Exception(f'Pluggy API error: {response.text}')
+        response.raise_for_status()
+        return response.json()

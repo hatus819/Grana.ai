@@ -8,6 +8,4 @@ class BankAccountSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 class ConnectBankAccountSerializer(serializers.Serializer):
-    bank_code = serializers.CharField(max_length=10)
-    account_number = serializers.CharField(max_length=20)
-    # Add other fields as needed for Pluggy connection
+    itemId = serializers.CharField(max_length=100)

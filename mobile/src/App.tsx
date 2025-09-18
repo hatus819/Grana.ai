@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from 'react-query';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import DashboardScreen from './screens/DashboardScreen';
+import BankConnectionScreen from './screens/BankConnectionScreen';
 
 const Stack = createNativeStackNavigator();
 const queryClient = new QueryClient();
@@ -16,10 +17,11 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <NavigationContainer>
         <Stack.Navigator initialRouteName="Login">
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="Register" component={RegisterScreen} />
-          <Stack.Screen name="Dashboard" component={DashboardScreen} />
-        </Stack.Navigator>
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="BankConnection" component={BankConnectionScreen} />
+        <Stack.Screen name="Dashboard" component={DashboardScreen} />
+      </Stack.Navigator>
       </NavigationContainer>
     </QueryClientProvider>
   );
