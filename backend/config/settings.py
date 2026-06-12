@@ -152,6 +152,18 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'America/Sao_Paulo'
+# Fail fast when the broker is down so the views' fallback logic runs in
+# ~2s instead of ~19s of connection retries per .delay() call.
+CELERY_TASK_PUBLISH_RETRY = False
+CELERY_BROKER_CONNECTION_TIMEOUT = 2
+
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    'sync-bank-accounts-daily': {
+        'task': 'apps.banking.tasks.sync_all_active_accounts',
+        'schedule': crontab(hour=5, minute=0),
+    },
+}
 
 # Custom user model
 AUTH_USER_MODEL = 'authentication.CustomUser'

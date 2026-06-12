@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grana.AI — Teste de Conexão Bancária (sandbox)</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #222; }
+    h1 { font-size: 1.3rem; }
+    form { display: flex; gap: 8px; margin: 16px 0; }
+    input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
+    button { padding: 10px 16px; border: 0; border-radius: 6px; background: #0a7d4f; color: #fff; font-weight: 600; cursor: pointer; }
+    pre { background: #f5f5f5; padding: 12px; border-radius: 6px; white-space: pre-wrap; min-height: 80px; }
+    .hint { color: #666; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <h1>Grana.AI — Conexão bancária via Pluggy Connect</h1>
+  <p class="hint">Faça login com um usuário do Grana.AI. No widget, escolha
+    <strong>Pluggy Bank</strong> (sandbox) e use <code>user-ok</code> /
+    <code>password-ok</code> (MFA: <code>123456</code>).</p>
+
+  <form id="login-form">
+    <input id="email" type="email" placeholder="email" required>
+    <input id="password" type="password" placeholder="senha" required>
+    <button>Entrar e conectar banco</button>
+  </form>
+  <pre id="log"></pre>
+
+  <script src="https://cdn.pluggy.ai/pluggy-connect/v2.8.2/pluggy-connect.js"></script>
+  <script>
+    const API = 'http://127.0.0.1:8000/api/v1';
+    const log = (m) => { document.getElementById('log').textContent += m + '\n'; };
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const login = await fetch(`${API}/auth/login/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+          }),
+        });
+        if (!login.ok) { log('Login falhou: ' + await login.text()); return; }
+        const { tokens } = await login.json();
+        const auth = {
+          'Authorization': `Bearer ${tokens.access}`,
+          'Content-Type': 'application/json',
+        };
+        log('Login OK');
+
+        const ct = await fetch(`${API}/banking/connect-token/`, { method: 'POST', headers: auth });
+        if (!ct.ok) { log('Connect token falhou: ' + await ct.text()); return; }
+        const { accessToken } = await ct.json();
+        log('Connect token OK — abrindo widget Pluggy...');
+
+        const pluggyConnect = new PluggyConnect({
+          connectToken: accessToken,
+          includeSandbox: true,
+          onSuccess: async (itemData) => {
+            const itemId = itemData.item.id;
+            log(`Banco conectado! item=${itemId}`);
+            log(`  status=${itemData.item.status} execution=${itemData.item.executionStatus} clientUserId=${itemData.item.clientUserId}`);
+            log('Importando contas e os últimos 90 dias de transações...');
+            const resp = await fetch(`${API}/banking/accounts/connect/`, {
+              method: 'POST', headers: auth, body: JSON.stringify({ itemId }),
+            });
+            const body = await resp.json();
+            log(`HTTP ${resp.status}: ${JSON.stringify(body, null, 2)}`);
+
+            // With a Celery worker the sync is async — poll until the
+            // count stabilizes instead of reading it once.
+            let data = { count: 0, results: [] };
+            let previous = -1;
+            for (let i = 0; i < 8 && data.count !== previous; i++) {
+              previous = data.count;
+              await new Promise(r => setTimeout(r, 3000));
+              const txs = await fetch(`${API}/transactions/`, { headers: auth });
+              data = await txs.json();
+              log(`  transações até agora: ${data.count}`);
+            }
+            log(`Transações importadas: ${data.count}`);
+            (data.results || []).slice(0, 5).forEach(
+              t => log(`  ${t.date.slice(0, 10)}  ${t.amount}  ${t.description}`));
+          },
+          onError: (err) => log('Erro no widget: ' + JSON.stringify(err)),
+        });
+        pluggyConnect.init();
+      } catch (err) {
+        log('Erro: ' + err);
+      }
+    });
+  </script>
+</body>
+</html>

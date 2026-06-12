@@ -5,6 +5,7 @@ app_name = 'banking'
 
 urlpatterns = [
     path('accounts/', views.list_bank_accounts, name='list_bank_accounts'),
+    path('connect-token/', views.create_connect_token, name='connect_token'),
     path('accounts/connect/', views.connect_bank_account, name='connect_bank_account'),
     path('accounts/<int:account_id>/disconnect/', views.disconnect_bank_account, name='disconnect_bank_account'),
     path('accounts/<int:account_id>/transactions/fetch/', views.fetch_transactions, name='fetch_transactions'),
