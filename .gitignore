@@ -1,0 +1,30 @@
+# Secrets / local config — never commit
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.coverage
+.pytest_cache/
+venv/
+.venv/
+
+# Databases
+*.sqlite3
+*.sqlite3.*
+
+# Collected static files
+staticfiles/
+
+# Node
+node_modules/
+
+# Build output
+web/build/
+mobile/.expo/
+dist/
+
+# OS / editor
+.DS_Store
