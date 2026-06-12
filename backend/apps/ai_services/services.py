@@ -1,5 +1,7 @@
+import hashlib
 import openai
 import os
+from decimal import Decimal
 from django.core.cache import cache
 from .models import AICache
 
@@ -33,7 +35,11 @@ class AIService:
 
     @staticmethod
     def categorize_transaction(description, amount):
-        cache_key = f"categorize_{description}_{amount}"
+        # Key on description + sign: income vs expense changes the meaning,
+        # magnitude rarely does (and would kill the cache hit rate).
+        sign = '+' if Decimal(str(amount)) >= 0 else '-'
+        digest = hashlib.sha256(f"{description}|{sign}".encode()).hexdigest()
+        cache_key = f"categorize:{digest}"
         try:
             cached_result = cache.get(cache_key)
             if cached_result:

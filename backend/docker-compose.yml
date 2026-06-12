@@ -48,5 +48,15 @@ services:
       - redis
     environment: *app_env
 
+  celery_beat:
+    build: .
+    command: celery -A config beat --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    environment: *app_env
+
 volumes:
   postgres_data:

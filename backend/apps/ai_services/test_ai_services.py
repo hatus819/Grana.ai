@@ -63,6 +63,48 @@ class AIServiceOutputValidationTests(TestCase):
             'gpt-4.1-mini')
 
 
+class CacheKeyTests(TestCase):
+    @patch('apps.ai_services.services.AICache')
+    @patch('apps.ai_services.services.cache')
+    @patch('apps.ai_services.services.openai.OpenAI')
+    def test_cache_key_is_cache_backend_safe(self, mock_openai, mock_cache, mock_ai_cache):
+        """Descriptions contain spaces/punctuation — the cache key must not
+        (memcached-incompatible and triggers CacheKeyWarning)."""
+        mock_cache.get.return_value = None
+        mock_queryset = MagicMock()
+        mock_queryset.first.return_value = None
+        mock_ai_cache.objects.filter.return_value = mock_queryset
+        _mock_openai_returning(mock_openai, 'Serviços')
+
+        with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
+            AIService.categorize_transaction('Pagamento de boleto', -100.00)
+
+        key = mock_cache.set.call_args.args[0]
+        self.assertNotIn(' ', key)
+        self.assertLess(len(key), 250)
+
+    @patch('apps.ai_services.services.AICache')
+    @patch('apps.ai_services.services.cache')
+    @patch('apps.ai_services.services.openai.OpenAI')
+    def test_cache_key_distinguishes_income_from_expense(self, mock_openai, mock_cache, mock_ai_cache):
+        """Same description with opposite signs (PIX in vs out) must not
+        share a cached category; magnitude alone must (cache hit rate)."""
+        mock_cache.get.return_value = None
+        mock_queryset = MagicMock()
+        mock_queryset.first.return_value = None
+        mock_ai_cache.objects.filter.return_value = mock_queryset
+        _mock_openai_returning(mock_openai, 'Outros')
+
+        with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
+            AIService.categorize_transaction('PIX TRANSFERENCIA', 5000.00)
+            AIService.categorize_transaction('PIX TRANSFERENCIA', -50.00)
+            AIService.categorize_transaction('PIX TRANSFERENCIA', -900.00)
+
+        keys = [c.args[0] for c in mock_cache.set.call_args_list]
+        self.assertNotEqual(keys[0], keys[1])
+        self.assertEqual(keys[1], keys[2])
+
+
 class CategorizeTaskTests(TestCase):
     @patch('apps.ai_services.tasks.AIService.categorize_transaction')
     def test_task_creates_category_with_list_keywords(self, mock_categorize):
