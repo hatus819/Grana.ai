@@ -1,91 +1,145 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useMutation } from 'react-query';
-import axios from 'axios';
+import { useState } from 'react'
+import { useNavigate, Link } from 'react-router'
+import axios from 'axios'
+import { api, setTokens } from '../lib/api'
+import type { ApiErrors } from '../lib/types'
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+export default function RegisterPage() {
+  const navigate = useNavigate()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [phone, setPhone] = useState('')
+  const [cpf, setCpf] = useState('')
+  const [errors, setErrors] = useState<ApiErrors>({})
+  const [submitting, setSubmitting] = useState(false)
 
-const RegisterPage = () => {
-  const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [phone, setPhone] = useState('');
-  const [cpf, setCpf] = useState('');
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setErrors({})
+    setSubmitting(true)
 
-  const registerMutation = useMutation(
-    (data: { email: string; password: string; password_confirm: string; phone: string; cpf: string }) =>
-      axios.post(`${API_BASE_URL}/auth/register/`, data),
-    {
-      onSuccess: () => {
-        alert('Conta criada com sucesso!');
-        navigate('/login');
-      },
-      onError: (error: any) => {
-        const errors = error.response?.data || {};
-        const errorMessage = Object.values(errors).flat().join('\n');
-        alert(errorMessage || 'Erro ao criar conta');
-      },
+    // Build body — omit phone/cpf when blank
+    const body: Record<string, string> = {
+      email,
+      password,
+      password_confirm: passwordConfirm,
     }
-  );
+    if (phone.trim()) body.phone = phone.trim()
+    if (cpf.trim()) body.cpf = cpf.trim()
 
-  const handleRegister = () => {
-    if (!email || !password || !passwordConfirm) {
-      alert('Preencha todos os campos obrigatórios');
-      return;
+    try {
+      const response = await api.post('auth/register/', body)
+      setTokens(response.data.tokens)
+      void navigate('/dashboard')
+    } catch (err) {
+      if (axios.isAxiosError<ApiErrors>(err) && err.response?.status === 400 && err.response.data) {
+        setErrors(err.response.data)
+      } else {
+        setErrors({ non_field_errors: ['An unexpected error occurred. Please try again.'] })
+      }
+    } finally {
+      setSubmitting(false)
     }
-    if (password !== passwordConfirm) {
-      alert('As senhas não coincidem');
-      return;
-    }
-    registerMutation.mutate({ email, password, password_confirm: passwordConfirm, phone, cpf });
-  };
+  }
 
   return (
-    <div className="register-container">
-      <h1>Grana.AI</h1>
-      <h2>Cadastro</h2>
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        autoComplete="username"
-      />
-      <input
-        type="password"
-        placeholder="Senha"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        autoComplete="new-password"
-      />
-      <input
-        type="password"
-        placeholder="Confirmar Senha"
-        value={passwordConfirm}
-        onChange={(e) => setPasswordConfirm(e.target.value)}
-        autoComplete="new-password"
-      />
-      <input
-        type="tel"
-        placeholder="Telefone (opcional)"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-      />
-      <input
-        type="text"
-        placeholder="CPF (opcional)"
-        value={cpf}
-        onChange={(e) => setCpf(e.target.value)}
-      />
-      <button onClick={handleRegister} disabled={registerMutation.isLoading}>
-        {registerMutation.isLoading ? 'Criando conta...' : 'Cadastrar'}
-      </button>
-      <p>
-        Já tem conta? <a href="/login">Faça login</a>
+    <div style={{ maxWidth: 400, margin: '80px auto', padding: '0 16px' }}>
+      <h1>Create Account</h1>
+
+      {errors.non_field_errors?.map((msg) => (
+        <p key={msg} style={{ color: 'red' }}>{msg}</p>
+      ))}
+
+      <form onSubmit={handleSubmit} noValidate>
+        <div style={{ marginBottom: 12 }}>
+          <label htmlFor="email">Email</label>
+          <br />
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            style={{ width: '100%', padding: 8 }}
+          />
+          {errors.email?.map((msg) => (
+            <p key={msg} style={{ color: 'red', margin: '4px 0 0' }}>{msg}</p>
+          ))}
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label htmlFor="password">Password</label>
+          <br />
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+            style={{ width: '100%', padding: 8 }}
+          />
+          {errors.password?.map((msg) => (
+            <p key={msg} style={{ color: 'red', margin: '4px 0 0' }}>{msg}</p>
+          ))}
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label htmlFor="password_confirm">Confirm Password</label>
+          <br />
+          <input
+            id="password_confirm"
+            type="password"
+            value={passwordConfirm}
+            onChange={(e) => setPasswordConfirm(e.target.value)}
+            autoComplete="new-password"
+            style={{ width: '100%', padding: 8 }}
+          />
+          {errors.password_confirm?.map((msg) => (
+            <p key={msg} style={{ color: 'red', margin: '4px 0 0' }}>{msg}</p>
+          ))}
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label htmlFor="phone">Phone (optional)</label>
+          <br />
+          <input
+            id="phone"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            autoComplete="tel"
+            style={{ width: '100%', padding: 8 }}
+          />
+          {errors.phone?.map((msg) => (
+            <p key={msg} style={{ color: 'red', margin: '4px 0 0' }}>{msg}</p>
+          ))}
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label htmlFor="cpf">CPF (optional)</label>
+          <br />
+          <input
+            id="cpf"
+            type="text"
+            value={cpf}
+            onChange={(e) => setCpf(e.target.value)}
+            autoComplete="off"
+            style={{ width: '100%', padding: 8 }}
+          />
+          {errors.cpf?.map((msg) => (
+            <p key={msg} style={{ color: 'red', margin: '4px 0 0' }}>{msg}</p>
+          ))}
+        </div>
+
+        <button type="submit" disabled={submitting} style={{ padding: '8px 24px' }}>
+          {submitting ? 'Creating account…' : 'Sign Up'}
+        </button>
+      </form>
+
+      <p style={{ marginTop: 16 }}>
+        Already have an account? <Link to="/login">Sign in</Link>
       </p>
     </div>
-  );
-};
-
-export default RegisterPage;
+  )
+}
