@@ -56,19 +56,31 @@ Grana.AI é um aplicativo completo para gerenciamento de finanças pessoais foca
 
 ### Web
 
-1. Instale dependências:  
+A interface web é uma SPA em **Vite + React + TypeScript**.
+
+1. Instale as dependências:
    ```bash
    cd web
    npm install
    ```
-2. Inicie o servidor de desenvolvimento:  
+2. Configure o ambiente — copie `.env.example` para `.env` e ajuste se necessário:
    ```bash
-   npm start
+   cp .env.example .env
+   # VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
+   ```
+3. Inicie o servidor de desenvolvimento (porta **5173**, já liberada no CORS do backend):
+   ```bash
+   npm run dev
+   ```
+4. Outros comandos úteis:
+   ```bash
+   npm run build     # build de produção
+   npx vitest run    # testes (vitest + Testing Library)
+   npx tsc -b --noEmit  # checagem de tipos
    ```
 
 ## Atualizações Futuras
 
-- Implementar testes automatizados para frontend web.
 - Adicionar suporte a múltiplas contas bancárias por usuário.
 - Melhorar a engine de IA com modelos mais avançados.
 - Implementar notificações push no app mobile.

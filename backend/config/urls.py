@@ -7,6 +7,7 @@ urlpatterns = [
     path('api/v1/auth/', include('apps.authentication.urls')),
     path('api/v1/banking/', include('apps.banking.urls')),
     path('api/v1/transactions/', include('apps.transactions.urls')),
+    path('api/v1/dashboard/', include('apps.dashboard.urls')),
     # API Schema:
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     # Optional UI:

@@ -1,133 +1,269 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from 'react-query';
-import axios from 'axios';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import axios from 'axios'
+import { api, clearTokens } from '../lib/api'
+import { sleep } from '../lib/sleep'
+import { parseAmount, formatBRL } from '../lib/money'
+import StatCard from '../components/StatCard'
+import CategoryPie from '../components/CategoryPie'
+import TransactionList from '../components/TransactionList'
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+// ─── Pagination defaults (must match backend: page + limit, default limit=20) ─
 
-interface Transaction {
-  id: number;
-  amount: number;
-  description: string;
-  date: string;
-  category: {
-    name: string;
-    color: string;
-  } | null;
+const DEFAULT_LIMIT = 20
+
+// ─── Sync-poll helper (exported so it can be unit-tested without timers) ──────
+
+export const SYNC_POLL_INTERVAL_MS = 3000
+export const SYNC_MAX_POLLS = 8
+
+export async function pollUntilStable(
+  sleepFn: (ms: number) => Promise<void> = sleep,
+): Promise<void> {
+  let prev = -1
+  let count = 0
+  for (let i = 0; i < SYNC_MAX_POLLS && count !== prev; i++) {
+    prev = count
+    await sleepFn(SYNC_POLL_INTERVAL_MS)
+    try {
+      count = (await api.get('transactions/')).data.count
+    } catch {
+      break
+    }
+  }
 }
 
-const DashboardPage = () => {
-  const navigate = useNavigate();
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+// ─── API response types ───────────────────────────────────────────────────────
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      navigate('/login');
-    } else {
-      setAccessToken(token);
+interface CategoryEntry {
+  category: string | null
+  color: string | null
+  total: string
+  count: number
+}
+
+interface SummaryData {
+  balance: string
+  income: string
+  expenses: string
+  by_category: CategoryEntry[]
+  period: { start_date: string; end_date: string }
+}
+
+interface TransactionItem {
+  id: string
+  pluggy_transaction_id: string
+  amount: string
+  description: string
+  date: string
+  category: { id: string; name: string; icon?: string; color?: string } | null
+  is_processed: boolean
+}
+
+interface TransactionsData {
+  count: number
+  results: TransactionItem[]
+}
+
+interface AccountItem {
+  id: string
+  pluggy_account_id: string
+  bank_name: string
+  account_type: string
+  balance: string
+  is_active: boolean
+}
+
+// ─── DashboardPage ────────────────────────────────────────────────────────────
+
+export default function DashboardPage() {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [page, setPage] = useState(1)
+  const [syncing, setSyncing] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
+
+  // ── Logout ─────────────────────────────────────────────────────────────────
+  function handleLogout() {
+    clearTokens()
+    void navigate('/login')
+  }
+
+  // ── Queries ────────────────────────────────────────────────────────────────
+
+  const { data: summary, isError: summaryError } = useQuery<SummaryData>({
+    queryKey: ['dashboard/summary'],
+    queryFn: async () => {
+      const res = await api.get('dashboard/summary/')
+      return (res as { data: SummaryData }).data
+    },
+  })
+
+  const { data: txData, isError: txError } = useQuery<TransactionsData>({
+    queryKey: ['transactions', page],
+    queryFn: async () => {
+      const res = await api.get('transactions/', { params: { page, limit: DEFAULT_LIMIT } })
+      return (res as { data: TransactionsData }).data
+    },
+  })
+
+  const { data: accounts } = useQuery<AccountItem[]>({
+    queryKey: ['banking/accounts'],
+    queryFn: async () => {
+      const res = await api.get('banking/accounts/')
+      return (res as { data: AccountItem[] }).data
+    },
+  })
+
+  // ── Sincronizar ────────────────────────────────────────────────────────────
+
+  async function handleSync() {
+    if (syncing || !accounts || accounts.length === 0) return
+    setSyncing(true)
+    setSyncError(null)
+    try {
+      const active = accounts.filter((a) => a.is_active)
+      for (const a of active) {
+        await api.post(`banking/accounts/${a.id}/transactions/fetch/`)
+      }
+      await pollUntilStable()
+      await queryClient.invalidateQueries({ queryKey: ['dashboard/summary'] })
+      await queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      setPage(1)
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 503) {
+        setSyncError('Serviço bancário temporariamente indisponível. Tente novamente mais tarde.')
+      } else {
+        setSyncError('Não foi possível sincronizar. Tente novamente.')
+      }
+    } finally {
+      setSyncing(false)
     }
-  }, [navigate]);
+  }
 
-  const { data: transactions, isLoading } = useQuery(
-    'transactions',
-    () =>
-      axios.get<{ results: Transaction[] }>(`${API_BASE_URL}/transactions/`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }),
-    {
-      enabled: !!accessToken,
-    }
-  );
+  // ── Render ─────────────────────────────────────────────────────────────────
 
-  const handleLogout = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    navigate('/login');
-  };
-
-  const totalBalance = transactions?.data.results.reduce((sum, t) => sum + t.amount, 0) || 0;
-  const income = transactions?.data.results.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0) || 0;
-  const expenses = transactions?.data.results.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0) || 0;
-
-  // Prepare chart data
-  const chartData = [
-    { name: 'Receitas', value: income },
-    { name: 'Despesas', value: Math.abs(expenses) },
-  ];
+  // summaryError used to guard future error display; declared to avoid unused-var warning
+  void summaryError
 
   return (
-    <div className="dashboard-container">
-      <header className="dashboard-header">
-        <h1>Grana.AI</h1>
-        <button onClick={handleLogout} className="logout-btn">Sair</button>
-      </header>
-
-      <div className="stats-grid">
-        <div className="stat-card">
-          <h3>Saldo Total</h3>
-          <p className={totalBalance >= 0 ? 'positive' : 'negative'}>
-            R$ {totalBalance.toFixed(2)}
-          </p>
-        </div>
-        <div className="stat-card">
-          <h3>Receitas</h3>
-          <p className="positive">R$ {income.toFixed(2)}</p>
-        </div>
-        <div className="stat-card">
-          <h3>Despesas</h3>
-          <p className="negative">R$ {Math.abs(expenses).toFixed(2)}</p>
+    <div style={{ padding: 32, maxWidth: 1100, margin: '0 auto', fontFamily: 'sans-serif' }}>
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 24,
+        }}
+      >
+        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700 }}>Painel</h1>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <Link
+            to="/connect"
+            style={{
+              fontSize: 14,
+              color: '#2563eb',
+              textDecoration: 'none',
+              fontWeight: 500,
+            }}
+          >
+            Conectar banco
+          </Link>
+          <button
+            type="button"
+            onClick={() => void handleSync()}
+            disabled={syncing}
+            style={{
+              padding: '7px 16px',
+              borderRadius: 6,
+              border: '1px solid #d1d5db',
+              background: syncing ? '#f3f4f6' : '#fff',
+              cursor: syncing ? 'not-allowed' : 'pointer',
+              fontSize: 14,
+              fontWeight: 500,
+            }}
+          >
+            {syncing ? 'Sincronizando...' : 'Sincronizar'}
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={{
+              padding: '7px 16px',
+              borderRadius: 6,
+              border: '1px solid #d1d5db',
+              background: '#fff',
+              cursor: 'pointer',
+              fontSize: 14,
+            }}
+          >
+            Sair
+          </button>
         </div>
       </div>
 
-      <div className="chart-container">
-        <h2>Visão Geral</h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip formatter={(value) => `R$ ${value}`} />
-            <Bar dataKey="value" fill="#007bff" />
-          </BarChart>
-        </ResponsiveContainer>
+      {/* Sync error message */}
+      {syncError && (
+        <div
+          role="alert"
+          style={{
+            background: '#fef2f2',
+            border: '1px solid #fca5a5',
+            borderRadius: 6,
+            padding: '10px 16px',
+            marginBottom: 16,
+            color: '#b91c1c',
+            fontSize: 14,
+          }}
+        >
+          {syncError}
+        </div>
+      )}
+
+      {/* Stat Cards */}
+      <div style={{ display: 'flex', gap: 16, marginBottom: 32, flexWrap: 'wrap' }}>
+        <StatCard
+          label="Saldo"
+          value={summary ? formatBRL(parseAmount(summary.balance)) : '—'}
+          color="#111827"
+        />
+        <StatCard
+          label="Receitas"
+          value={summary ? formatBRL(parseAmount(summary.income)) : '—'}
+          color="#10b981"
+        />
+        <StatCard
+          label="Despesas"
+          value={summary ? formatBRL(parseAmount(summary.expenses)) : '—'}
+          color="#ef4444"
+        />
       </div>
 
-      <div className="transactions-section">
-        <h2>Transações Recentes</h2>
-        {isLoading ? (
-          <p>Carregando...</p>
+      {/* Category Pie */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Despesas por categoria</h2>
+        <CategoryPie data={summary?.by_category ?? []} />
+      </div>
+
+      {/* Transaction List */}
+      <div>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Transações</h2>
+        {txData ? (
+          <TransactionList
+            transactions={txData.results}
+            count={txData.count}
+            page={page}
+            limit={DEFAULT_LIMIT}
+            onPageChange={(p) => setPage(p)}
+          />
+        ) : txError ? (
+          <p style={{ color: '#ef4444', fontSize: 14 }}>Não foi possível carregar as transações.</p>
         ) : (
-          <div className="transactions-list">
-            {transactions?.data.results.slice(0, 10).map((transaction) => (
-              <div key={transaction.id} className="transaction-item">
-                <div className="transaction-info">
-                  <p className="transaction-description">{transaction.description}</p>
-                  <p className="transaction-date">
-                    {new Date(transaction.date).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-                <div className="transaction-amount">
-                  <p className={transaction.amount < 0 ? 'negative' : 'positive'}>
-                    R$ {transaction.amount.toFixed(2)}
-                  </p>
-                  {transaction.category && (
-                    <span
-                      className="transaction-category"
-                      style={{ backgroundColor: transaction.category.color }}
-                    >
-                      {transaction.category.name}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          <p style={{ color: '#6b7280', fontSize: 14 }}>Carregando transações...</p>
         )}
       </div>
     </div>
-  );
-};
-
-export default DashboardPage;
+  )
+}

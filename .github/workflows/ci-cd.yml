@@ -31,8 +31,30 @@ jobs:
         cd backend
         python -m pytest -v
 
+  test-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: web/package-lock.json
+    - name: Install dependencies
+      run: npm ci
+    - name: Typecheck
+      run: npx tsc -b --noEmit
+    - name: Run tests
+      run: npx vitest run
+    - name: Build
+      run: npm run build
+
   build-and-deploy:
-    needs: test-backend
+    needs: [test-backend, test-web]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
     steps:
